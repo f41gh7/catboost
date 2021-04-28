@@ -1,8 +1,8 @@
 use crate::error::{CatBoostError, CatBoostResult};
 use catboost_sys;
-use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
+use std::ffi::CString;
 
 pub struct Model {
     handle: *mut catboost_sys::ModelCalcerHandle,
@@ -26,6 +26,19 @@ impl Model {
         Ok(model)
     }
 
+    /// Load a model from a buffer
+    pub fn load_buffer<P: AsRef<Vec<u8>>>(buffer: P) -> CatBoostResult<Self> {
+        let model = Model::new();
+        CatBoostError::check_return_value(unsafe {
+            catboost_sys::LoadFullModelFromBuffer(
+                model.handle,
+                buffer.as_ref().as_ptr() as *const std::os::raw::c_void,
+                buffer.as_ref().len() as u64,
+            )
+        })?;
+        Ok(model)
+    }
+
     /// Calculate raw model predictions on float features and string categorical feature values
     pub fn calc_model_prediction(
         &self,
@@ -45,7 +58,7 @@ impl Model {
                     .map(|cat_feature| unsafe {
                         catboost_sys::GetStringCatFeatureHash(
                             cat_feature.as_ptr() as *const std::os::raw::c_char,
-                            cat_feature.len(),
+                            cat_feature.len() as u64,
                         )
                     })
                     .collect::<Vec<_>>()
@@ -61,13 +74,13 @@ impl Model {
         CatBoostError::check_return_value(unsafe {
             catboost_sys::CalcModelPredictionWithHashedCatFeatures(
                 self.handle,
-                float_features.len(),
+                float_features.len() as u64,
                 float_features_ptr.as_mut_ptr(),
-                float_features[0].len(),
+                float_features[0].len() as u64,
                 hashed_cat_features_ptr.as_mut_ptr(),
-                cat_features[0].len(),
+                cat_features[0].len() as u64,
                 prediction.as_mut_ptr(),
-                prediction.len(),
+                prediction.len() as u64,
             )
         })?;
         Ok(prediction)
@@ -75,22 +88,22 @@ impl Model {
 
     /// Get expected float feature count for model
     pub fn get_float_features_count(&self) -> usize {
-        unsafe { catboost_sys::GetFloatFeaturesCount(self.handle) }
+        unsafe { catboost_sys::GetFloatFeaturesCount(self.handle) as usize}
     }
 
     /// Get expected categorical feature count for model
     pub fn get_cat_features_count(&self) -> usize {
-        unsafe { catboost_sys::GetCatFeaturesCount(self.handle) }
+        unsafe { catboost_sys::GetCatFeaturesCount(self.handle) as usize}
     }
 
     /// Get number of trees in model
     pub fn get_tree_count(&self) -> usize {
-        unsafe { catboost_sys::GetTreeCount(self.handle) }
+        unsafe { catboost_sys::GetTreeCount(self.handle) as usize}
     }
 
     /// Get number of dimensions in model
     pub fn get_dimensions_count(&self) -> usize {
-        unsafe { catboost_sys::GetDimensionsCount(self.handle) }
+        unsafe { catboost_sys::GetDimensionsCount(self.handle) as usize }
     }
 }
 
@@ -103,12 +116,26 @@ impl Drop for Model {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Read;
 
     #[test]
     fn load_model() {
-        let model = Model::load("tmp/model.bin");
+        let model = Model::load("../tmp/model.bin");
         assert!(model.is_ok());
     }
+
+    #[test]
+    fn load_model_from_vec() {
+        let mut file = std::fs::File::open("../tmp/model.bin").unwrap();
+        let mut data = Vec::new();
+        file.read_to_end(&mut data).unwrap();
+        let model = Model::load_buffer(data);
+        assert!(model.is_ok());
+        let model = model.unwrap();
+        assert_eq!(model.get_cat_features_count(),1);
+        assert_eq!(model.get_float_features_count(),3);
+    }
+
 
     #[test]
     fn calc_prediction() {

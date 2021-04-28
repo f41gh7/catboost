@@ -8,6 +8,12 @@ pub struct CatBoostError {
     description: String,
 }
 
+impl ToString for CatBoostError{
+    fn to_string(&self) -> String {
+        self.description.clone()
+    }
+}
+
 impl CatBoostError {
     /// Check the return value from an CatBoost FFI call, and return the last error message on error.
     /// Return values of true are treated as success, returns values of false are treated as errors.
