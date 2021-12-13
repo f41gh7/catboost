@@ -28,3 +28,9 @@ impl CatBoostError {
         }
     }
 }
+
+impl ToString for CatBoostError {
+    fn to_string(&self) -> String {
+        self.description.clone()
+    }
+}
