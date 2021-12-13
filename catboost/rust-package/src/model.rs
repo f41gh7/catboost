@@ -1,5 +1,6 @@
 use crate::error::{CatBoostError, CatBoostResult};
 use catboost_sys;
+use std::convert::TryInto;
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -31,9 +32,9 @@ impl Model {
         let model = Model::new();
         CatBoostError::check_return_value(unsafe {
             catboost_sys::LoadFullModelFromBuffer(
-                model.handle,
+                model.handle.try_into().unwrap(),
                 buffer.as_ref().as_ptr() as *const std::os::raw::c_void,
-                buffer.as_ref().len(),
+                buffer.as_ref().len().try_into().unwrap(),
             )
         })?;
         Ok(model)
@@ -58,7 +59,7 @@ impl Model {
                     .map(|cat_feature| unsafe {
                         catboost_sys::GetStringCatFeatureHash(
                             cat_feature.as_ptr() as *const std::os::raw::c_char,
-                            cat_feature.len(),
+                            cat_feature.len().try_into().unwrap(),
                         )
                     })
                     .collect::<Vec<_>>()
@@ -74,13 +75,13 @@ impl Model {
         CatBoostError::check_return_value(unsafe {
             catboost_sys::CalcModelPredictionWithHashedCatFeatures(
                 self.handle,
-                float_features.len(),
+                float_features.len().try_into().unwrap(),
                 float_features_ptr.as_mut_ptr(),
-                float_features[0].len(),
+                float_features[0].len().try_into().unwrap(),
                 hashed_cat_features_ptr.as_mut_ptr(),
-                cat_features[0].len(),
+                cat_features[0].len().try_into().unwrap(),
                 prediction.as_mut_ptr(),
-                prediction.len(),
+                prediction.len().try_into().unwrap(),
             )
         })?;
         Ok(prediction)
@@ -88,22 +89,34 @@ impl Model {
 
     /// Get expected float feature count for model
     pub fn get_float_features_count(&self) -> usize {
-        unsafe { catboost_sys::GetFloatFeaturesCount(self.handle) }
+        unsafe {
+            catboost_sys::GetFloatFeaturesCount(self.handle)
+                .try_into()
+                .unwrap()
+        }
     }
 
     /// Get expected categorical feature count for model
     pub fn get_cat_features_count(&self) -> usize {
-        unsafe { catboost_sys::GetCatFeaturesCount(self.handle) }
+        unsafe {
+            catboost_sys::GetCatFeaturesCount(self.handle)
+                .try_into()
+                .unwrap()
+        }
     }
 
     /// Get number of trees in model
     pub fn get_tree_count(&self) -> usize {
-        unsafe { catboost_sys::GetTreeCount(self.handle) }
+        unsafe { catboost_sys::GetTreeCount(self.handle).try_into().unwrap() }
     }
 
     /// Get number of dimensions in model
     pub fn get_dimensions_count(&self) -> usize {
-        unsafe { catboost_sys::GetDimensionsCount(self.handle) }
+        unsafe {
+            catboost_sys::GetDimensionsCount(self.handle)
+                .try_into()
+                .unwrap()
+        }
     }
 }
 
